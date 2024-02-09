@@ -1,0 +1,62 @@
+int main(void)
+{
+  HAL_Init(); //Reset of all peripherals, init the Flash and Systick
+	SystemClock_Config(); //Configure the system clock
+	
+	// Use RCC to enable clocks
+
+	RCC->AHBENR |= RCC_AHBENR_GPIOCEN; 
+	RCC->AHBENR |= RCC_AHBENR_GPIOAEN; // Enable clock for button in GPIOA too
+
+	//Set pins to general purpose output mode
+	GPIOC->MODER  &= ~(0x3 << 12);
+	GPIOC->MODER |= (0x1 << 12); 
+	GPIOC->MODER &= ~(0x3 << 14);
+	GPIOC->MODER |= (0x1 << 14);
+	
+	// Set pins to push-pull output type (means clear them)
+	GPIOC->OTYPER &= ~((1 << 6) | (1 << 7));
+
+	// Set pins to low speed in the OSPEEDR register
+	GPIOC->OSPEEDR  &= ~((1 << 12) | (1 << 14));
+
+	//Set to no pull-up/down resistors in the PUPDR register
+	GPIOC->PUPDR &= ~(0x15 << 12); //Shift 1111 inverted 12 so 12,13,14,15 are 0
+	
+	// Configure button pin to input mode with internal pull-down resistor enabled
+	GPIOA->MODER &= ~(0x3 << 0);
+	GPIOA->OSPEEDR &= ~(1 << 0);
+	GPIOA->PUPDR &= ~(0x3 << 0);
+	GPIOA->PUPDR |= (1 << 1);
+	
+	// Initialize one pin logic high and the other to low
+	GPIOC->ODR &= ~((1 << 6) | (1 << 7)); // Clear both bits so they are in known state
+	GPIOC->ODR |= (0x1 << 6); // Start PC6 high
+
+  // Button debouncing
+	uint32_t debouncer = 0;
+	while (1){
+		HAL_Delay(200); // Delay 200ms
+		debouncer = (debouncer << 1); //Always shift every loop iteration
+		
+		if(GPIOA->IDR & GPIO_IDR_0) { // If input signal is set/high, toggle red and blue lights
+			debouncer |= 0x01; // Set lowest but of bit-vector
+			GPIOC->ODR ^= GPIO_ODR_7;
+		  GPIOC->ODR ^= GPIO_ODR_6;
+		}
+		if(debouncer == 0xFFFFFFFF) { 
+			// This code triggers repeatedly when button is steady high!
+		}
+		if(debouncer == 0x00000000) { 
+			// This code triggers repeatedly when button is steady lowh!
+		}
+		if(debouncer == 0x7FFFFFFF) { 
+			// This code triggers only once when transitioning to steady high!
+		}
+		// When button is bouncing the bit vector value is random since bits are set when the button is high and not when it bounces low.
+		
+		//GPIOC->ODR ^= GPIO_ODR_7;
+		//GPIOC->ODR ^= GPIO_ODR_6;
+		
+	}
+}
